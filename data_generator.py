@@ -26,38 +26,80 @@ def predict(features):
 def clicked(ctype, atype):
   return np.random.rand() < click_prob(ctype, atype)
 
-# measuredPropensity = [
-#   [0, 0.3, 1]
-#   [0.3, 0.6, 2]
-#   [0.6, 1.0, 3]
-# ]
 
-#features
-# gender
-# age: { < 25, 26 - 50, > 50 }
-# propensity: 0,1,2
-# placebo: .7 are +
+class ClickGenerator:
 
-# pop params
-#
-
-# CTRs
-# m, <25: .08
-# f, <25: .04
-# m, 25-50: .05
-# f, 25-50: .05
-# m, >50: .03
-# f, >50: .07
-
-## case 1:
-# males have .05 propensity for c1 .04 propensity for c2
-# females have .04 propensity for c1 .05 propensity for c2
+  def __init__(self, base, features, propensity_rules, num_choices):
+    self.base = base
+    self.features = features
+    self.propensity_rules = propensity_rules
+    self.num_choices = num_choices
+    self.propensity_pcts = self.__calc_propensity_pcts(base, propensity_rules, num_choices)
 
 
-# propensity is at random and adds .002*num
+  def __calc_propensity_pcts(self, base, propensities, num_choices):
+    propentsity_pcts = {}
+    for i in range(2 ** len(self.features)):
+      fmt = "{:0" + str(len(self.features)) + "b}"
+      v_type = fmt.format(i)
+      pcts = np.array([base] * num_choices)
+      for rule, props in propensities.items():
+        if self.rule_match(v_type, rule):
+          pcts += props
+      propentsity_pcts[v_type] = pcts
+    return propentsity_pcts
+
+    # update visitor types with rules, so should look like, e.g.
+    #  (0,0,0): [0.04, 0.06]
+
+  # v_type is a bin string such as '0100'
+  def rule_match(self, v_type, rule):
+    for i, prop in enumerate(rule):
+      if prop:
+        f = '0' if self.features[i]['vals'][0] == prop else '1'
+        if f != v_type[i]:
+          return False
+    return True
+
+
+  def get_propensities(self, obs):
+    obs = ''.join(str(x) for x in obs)
+    return self.propensity_pcts[obs]
+
+def test():
+  base = 0.04
+  features = [
+    { 'name': 'sex', 'vals': ["f","m"]},
+    { 'name': 'placebo', 'vals': ["np","p"]},
+    { 'name': 'age', 'vals': ["young","old"]},
+  ]
+
+  propensities = {
+    ("f", None, None): [0.0, 0.01],
+    ("f", None, "young"): [0.04, 0.0],
+    ("m", None, None): [0.01, 0.0], # means males .01 more likely to click on choice 1 than general pop
+    ("m", None, "old"): [0.04, 0.0],
+    (None, None, "old"): [0.00, 0.02],
+  }
+
+  clickGen = ClickGenerator(base, features, propensities, 2)
+  tests = [
+    [[0,0,0], [0.08, 0.05]], # f young
+    [[0,0,1], [0.04, 0.07]], # f old
+    [[1,0,0], [0.05, 0.04]], # m young
+    [[1,0,1], [0.09, 0.06]], # m old
+  ]
+
+  for atest in tests:
+    props = clickGen.get_propensities(atest[0])
+    print(props)
+    assert(list(props) == atest[1])
+
+if __name__ == "__main__":
+  test()
+
 
 def simulate_data(count):
-  # flist = ['gender','placebo']
   malePct = .4
   placeboPct = .6
   maleClickPcts = [0.05, 0.04]
@@ -72,9 +114,6 @@ def simulate_data(count):
     click = 1 if random.random() < propensity else 0
     ds.append([sex,p,choice,click])
   return ds
-
-#
-
 
 
 def profile_data(data):
