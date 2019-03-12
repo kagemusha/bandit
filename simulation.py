@@ -9,13 +9,14 @@
 #
 #
 
-import random
 from itertools import product
 from visitor_model import VisitorModel
 from random_model import RandomModel
 from incremental_cart.efdt import Efdt
 from random import choice as rchoice
+from data_generator import ClickGenerator
 import random
+import numpy as np
 
 class Result:
   # order_num
@@ -82,7 +83,7 @@ def simulate_dt():
   batches = get_visitor_batches(batch_size, batch_count)
   ctrs = []
   features = ['sex','placebo']
-  model = Efdt(features, (0,1), delta=0.01, nmin=100, tau=0.5)
+  model = Efdt(features, (0,1), delta=0.001, nmin=100, tau=0.5)
   for i, batch in enumerate(batches):
     choices = get_batch_predictions(model, batch)
     results = get_clicks(choices, batch)
@@ -154,31 +155,103 @@ def test_dt():
       for features in list(product((0,1), (0,1))):
         print("pred: ", features, model.probs_single(features))
 
+def get_click_gen():
+  base = 0.04
+  features = [
+    { 'name': 'sex', 'vals': ["f","m"]},
+    { 'name': 'placebo', 'vals': ["np","p"]},
+    { 'name': 'age', 'vals': ["young","old"]},
+  ]
+
+  propensities = {
+    ("f", None, None): [0.0, 0.01],
+    ("f", None, "young"): [0.04, 0.0],
+    ("m", None, None): [0.01, 0.0], # means males .01 more likely to click on choice 1 than general pop
+    ("m", None, "old"): [0.04, 0.0],
+    (None, None, "old"): [0.00, 0.02],
+  }
+
+  return ClickGenerator(base, features, propensities, 2)
+
 def test_dt2():
   # generate visitors
-  print("test Dec Tree")
+  print("test Dec Tree 2")
   batch_size = 1000
-  batch_count = 10
-  feature_names = ['sex']
-  visit_params = [0.3]
+  batch_count = 30
+  feature_names = ['sex', 'placebo', 'age']
+  clickGen = get_click_gen()
+  visit_params = [0.5, 0.5, 0.5]
   batches = get_visitor_batches(batch_size, batch_count, feature_names, visit_params)
-  batch = batches[0]
+
   # get results
   for i in (1,2):
     print("---------")
     print("Choice ", i)
     print("Feature names: ", feature_names)
     model = Efdt(feature_names, (0,1), delta=0.01, nmin=100, tau=0.5)
-    for batch in batches:
-      choice_served = [i] * len(batch)
-      clicks = get_clicks(choice_served, batch)
-      print(clicks_by_sex(clicks, batch))
+
+    for bi, batch in enumerate(batches):
+      print(f"========Choice {i} Batch {bi}=======================")
+      choice_served = i
+      clicks = [clickGen.get_click(obs, choice_served) for obs in batch]
       for x,y in zip(batch, clicks):
         model.update(x, y)
 
       model.print_full_tree()
-      for features in ((0), (1)):
-        print("pred: ", features, model.probs_single(features))
+      for features in ((0,0,0), (0,0,1), (1,0,0), (1,0,1)):
+        print(features, " pred: ", "%.3f" % model.probs_single(features)[1])
+
+def get_click_gen3():
+  base = 0.04
+  features = [
+    { 'name': 'sex', 'vals': ["f","m"]},
+    { 'name': 'age', 'vals': ["young","old"]},
+  ]
+
+  propensities = {
+    ("f", None): [0.0, 0.01],
+    ("f", "young"): [0.04, 0.0],
+    ("m", None): [0.01, 0.0], # means males .01 more likely to click on choice 1 than general pop
+    ("m", "old"): [0.04, 0.0],
+    (None, "old"): [0.00, 0.02],
+  }
+
+  return ClickGenerator(base, features, propensities, 2)
+
+def test_dt3():
+  # generate visitors
+  print("test dec tree 2")
+  batch_size = 1000
+  batch_count = 30
+  feature_names = ['sex', 'age']
+  click_gen = get_click_gen3()
+  visit_params = [0.5, 0.5]
+  batches = get_visitor_batches(batch_size, batch_count, feature_names, visit_params)
+
+  # get results
+  for i in (1,2):
+    print("---------")
+    print("Choice ", i)
+    print("Feature names: ", feature_names)
+    model = Efdt(feature_names, (0,1), delta=0.01, nmin=100, tau=0.5)
+
+    for bi, batch in enumerate(batches):
+      print(f"========Choice {i} Batch {bi}=======================")
+      choice_served = i
+      clicks = [click_gen.get_click(obs, choice_served) for obs in batch]
+      for x,y in zip(batch, clicks):
+        model.update(x, y)
+
+      model.print_full_tree()
+      for features in ((0,0), (0,1), (1,0), (1,1)):
+        print(features, " pred: ", "%.3f" % model.probs_single(features)[1])
+#  want
+#   1       2
+#  .08     .05
+#  .04     .07
+#  .05     .04
+#  .09     .06
+
   # feed into 2 decision trees
   # get predictions from each
 
