@@ -66,6 +66,11 @@ class ClickGenerator:
     obs = ''.join(str(x) for x in obs)
     return self.propensity_pcts[obs]
 
+  def get_click(self, obs, choice):
+    pct = self.get_propensities(obs)[choice-1]
+    return random.random() < pct
+
+
 def test():
   base = 0.04
   features = [
@@ -146,21 +151,21 @@ def generate_visits(count, visit_params):
     dataset.append(obs)
   return dataset
 
+def test2():
+  count = 1000
+  visit_params = [0.3, 0.6]
+  ds = generate_visits(count, visit_params)
 
-count = 1000
-visit_params = [0.3, 0.6]
-ds = generate_visits(count, visit_params)
-
-assert(len(ds) == count)
-assert(len(ds[0]) == len(visit_params))
-sums = np.sum(ds, axis=0)
-print(sums.shape)
-for i, col in enumerate(ds[0]):
-  assert(col ==1 or col == 0)
-  pct = visit_params[i]
-  (lo, hi) = binom.interval(.954, 1000, pct)
-  print("sums", i, lo, sums[i], hi)
-  assert(lo <= sums[i] <= hi)
+  assert(len(ds) == count)
+  assert(len(ds[0]) == len(visit_params))
+  sums = np.sum(ds, axis=0)
+  print(sums.shape)
+  for i, col in enumerate(ds[0]):
+    assert(col ==1 or col == 0)
+    pct = visit_params[i]
+    (lo, hi) = binom.interval(.954, 1000, pct)
+    print("sums", i, lo, sums[i], hi)
+    assert(lo <= sums[i] <= hi)
 
 
 
