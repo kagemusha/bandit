@@ -67,8 +67,8 @@ class ClickGenerator:
     return self.propensity_pcts[obs]
 
   def get_click(self, obs, choice):
-    pct = self.get_propensities(obs)[choice-1]
-    return random.random() < pct
+    pct = self.get_propensities(obs)[choice]
+    return 1 if random.random() < pct else 0
 
 
 def test():
@@ -95,6 +95,7 @@ def test():
     [[1,0,1], [0.09, 0.06]], # m old
   ]
 
+  print("Assertions...")
   for atest in tests:
     props = clickGen.get_propensities(atest[0])
     print(props)
