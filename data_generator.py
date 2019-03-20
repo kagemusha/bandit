@@ -68,7 +68,9 @@ class ClickGenerator:
 
   def get_click(self, obs, choice):
     pct = self.get_propensities(obs)[choice]
-    return 1 if random.random() < pct else 0
+    r = random.random()
+    # print("PCT: ", pct, r, "YY" if r < pct else "")
+    return 1 if r < pct else 0
 
 
 def test():
@@ -167,8 +169,6 @@ def test2():
     (lo, hi) = binom.interval(.954, 1000, pct)
     print("sums", i, lo, sums[i], hi)
     assert(lo <= sums[i] <= hi)
-
-
 
 
 
