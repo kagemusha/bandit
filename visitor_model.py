@@ -6,10 +6,11 @@ class VisitorModel:
   def __init__(self, names, visitor_params):
     self.names = names
     self.visitor_params = visitor_params
-    print("==============")
+    print("\n==============")
     print("Visitor Model Params")
     for name, param in zip(names, visitor_params):
       print(f"{name} distribution: 1({param}) 0({1-param}) " )
+    print("==============\n")
 
 
   def generate_visits(self, count):
