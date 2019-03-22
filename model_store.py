@@ -18,6 +18,9 @@ def pickle_model(filename, model):
 def load_model_file(choice):
   filename = get_model_filename(choice)
   print("unpickling ", filename)
+  return load_model(filename)
+
+def load_model(filename):
   infile = open(filename, 'rb')
   model = pickle.load(infile)
   infile.close()

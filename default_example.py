@@ -3,6 +3,7 @@ from visitor_model import VisitorModel
 
 types = [(0,0), (0,1), (1,0), (1,1)]
 
+expected_choices = [0,1,1,0] # automate this
 
 def default_sex_age_click_gen():
   base = 0.04

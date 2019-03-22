@@ -1,33 +1,22 @@
-from random import choice as rchoice
 import default_example as de
-import random
 import numpy as np
 from util import print_clicks
-from model_store import load_model_file, save_model_file
-from skmultiflow.trees import HATT
+from model_store import load_model, pickle_model
+from bandit_model import BanditModel
 
-
-def get_choice_egreedy(explore, num_choices, models, features):
-  if random.random() < explore:
-    return rchoice(range(num_choices))
-  else:
-    feats = np.array(features).reshape(1,2)
-    probs = [model.predict_proba(feats) for model in models]
-    probs = [prob[0][1] for prob in probs]
-    return np.argmax(probs)
-
+MODEL_FILE = "_efdt_bandit_model"
+checkmark = u'\u2713'
 
 def online_ad_serving_sim():
   print("EFDT Online ad serving sim!")
   batch_size = 3000
-  batch_count = 5
+  batch_count = 10
   num_choices = 2
 
   # init models
+  model = BanditModel(2, {'explore': .1})
+  pickle_model(MODEL_FILE, model)
 
-  for choice in range(num_choices):
-    model = HATT()
-    save_model_file(choice, model)
 
   # get visit batches
   batches = de.get_batches(batch_size, batch_count)
@@ -40,20 +29,19 @@ def online_ad_serving_sim():
     choices = [choice] * len(batch)
     clicks = [click_gen.get_click(visit, choice) for visit,choice in zip(batch, choices)]
     print_clicks(de.types, choice, clicks, batch, choices)
-    model = load_model_file(choice)
+    model = load_model(MODEL_FILE)
 
     print(f"\nUpdating model {choice}...")
-    model.partial_fit(batch, clicks)
-    save_model_file(choice, model)
-    print_preds(model)
+    model.train(choice, batch, clicks)
+    print_preds(model, de.expected_choices)
+  pickle_model(MODEL_FILE, model)
   print("\n========= End Initial Run ===================\n")
 
-  correct_choices = [0,1,1,0] # automate this
 
   # Batch runs
   for i, batch in enumerate(batches):
-    models = [ load_model_file(choice) for choice in range(num_choices)]
-    choices = [get_choice_egreedy(.1, num_choices, models, visit) for visit in batch]
+    model = load_model(MODEL_FILE)
+    choices = [model.get_choice(visit) for visit in batch]
     clicks = [click_gen.get_click(visit, choice) for visit,choice in zip(batch, choices)]
     print_clicks(de.types, i, clicks, batch, choices)
     data = [ [[],[]] for _ in range(num_choices) ]
@@ -61,26 +49,25 @@ def online_ad_serving_sim():
       data[choice][0].append(visit)
       data[choice][1].append(click)
     for ch in range(num_choices):
-      models[ch].partial_fit(data[ch][0], data[ch][1])
-      save_model_file(ch, models[ch])
-    for i, features in enumerate([(0,0), (0,1), (1,0), (1,1)]):
-      preds = []
-      for k, model in enumerate(models):
-        feats = np.array(features).reshape(1,2)
-        preds.append(model.predict_proba(feats)[0][1])
-      pred_pct_str = " | ".join(['{:.1%}'.format(pred) for pred in preds])
-      served = np.argmax(preds)
-      print(features, " pred: ", pred_pct_str, served, served == correct_choices[i])
+      model.train(ch, data[ch][0], data[ch][1])
+    pickle_model(MODEL_FILE, model)
+    print_preds(model, de.expected_choices)
     # model.print_full_tree()
   print("done")
 
-def print_preds(model):
+def print_preds(model, expected_choices):
   print("Printing preds")
-  for features in de.types:
-    feats = np.array(features).reshape(1,2)
-    print("feats: ", feats)
-    pred = list(model.predict_proba(feats)[0])[1]
-    print("\t", features, " pred: ", '{:.1%}'.format(pred))
+  for features, expected in zip(de.types, expected_choices):
+    preds = list(model.predict_proba(features))
+    preds = [pred[1] if len(pred)>1 else pred[0] for pred in preds]
+    print("Features: ", features)
+
+
+    for i, pred in enumerate(preds):
+
+      print("\tModel ", {i}, ": ", '{:.1%}'.format(pred))
+    served = np.argmax(preds)
+    print(f"Served: {served} Expected: {expected} {checkmark if served == expected else 'x'}")
   # model.print_full_tree()
   print("-----\n")
 
